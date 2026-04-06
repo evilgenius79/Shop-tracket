@@ -44,8 +44,14 @@ def inventory_report():
 @reports_bp.route('/profit-loss')
 @login_required
 def profit_loss():
-    year = request.args.get('year', date.today().year, type=int)
+    today = date.today()
+    year = request.args.get('year', today.year, type=int)
     month = request.args.get('month', 0, type=int)
+    # Clamp to sane ranges
+    if year < 1900 or year > today.year + 1:
+        year = today.year
+    if month < 0 or month > 12:
+        month = 0
 
     query = db.session.query(Vehicle).join(Sale).filter(Vehicle.status == 'Sold')
 
@@ -123,7 +129,10 @@ def aging_report():
 @reports_bp.route('/expenses')
 @login_required
 def expense_report():
-    year = request.args.get('year', date.today().year, type=int)
+    _today = date.today()
+    year = request.args.get('year', _today.year, type=int)
+    if year < 1900 or year > _today.year + 1:
+        year = _today.year
     category_filter = request.args.get('category', '')
 
     query = Expense.query.filter(

@@ -213,7 +213,7 @@ def add_vehicle():
             created_by_id=current_user.id,
         )
         db.session.add(vehicle)
-        db.session.commit()
+        db.session.flush()  # Assign vehicle.id without committing yet
 
         # Auto-create purchase expense
         if vehicle.purchase_price:
@@ -231,7 +231,7 @@ def add_vehicle():
 
         log_activity(vehicle.id, 'Vehicle added',
                      f'Purchased for {vehicle.purchase_price} from {vehicle.purchase_source or "unknown"}')
-        db.session.commit()
+        db.session.commit()  # Single atomic commit for vehicle + expense + log
 
         flash(f'Vehicle {vehicle.display_name} (#{vehicle.stock_number}) added successfully!', 'success')
         return redirect(url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id))

@@ -7,12 +7,17 @@ from forms import LoginForm
 
 
 def _is_safe_redirect(target):
-    """Return True only if the redirect target is a relative path on this host."""
+    """Return True only if the redirect target is a safe relative path on this host."""
     if not target:
         return False
     parsed = urlparse(target)
-    # Reject anything with a scheme (http://, https://) or netloc (//evil.com)
-    return not parsed.scheme and not parsed.netloc
+    # Reject anything with a scheme (http://) or netloc (//evil.com)
+    if parsed.scheme or parsed.netloc:
+        return False
+    # Reject paths with multiple leading slashes (////evil.com browser quirks)
+    if target.startswith('//'):
+        return False
+    return True
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
