@@ -1,0 +1,6 @@
+carlot.db
+__pycache__/
+*.pyc
+static/uploads/
+*.log
+venv/

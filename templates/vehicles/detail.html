@@ -1,0 +1,641 @@
+{% extends 'base.html' %}
+{% block title %}{{ vehicle.display_name }}{% endblock %}
+{% block content %}
+
+<!-- Header -->
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{{ url_for('vehicles.list_vehicles') }}">Inventory</a></li>
+                <li class="breadcrumb-item active">{{ vehicle.stock_number }}</li>
+            </ol>
+        </nav>
+        <h2 class="fw-bold mb-1">{{ vehicle.display_name }}
+            {% if vehicle.trim %}<span class="text-muted fs-5 fw-normal"> {{ vehicle.trim }}</span>{% endif %}
+        </h2>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge fs-6 status-{{ vehicle.status | replace(' ', '-') | lower }}">{{ vehicle.status }}</span>
+            <span class="text-muted">Stock #{{ vehicle.stock_number }}</span>
+            {% if vehicle.vin %}<span class="font-monospace text-muted small">VIN: {{ vehicle.vin }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('vehicles.edit_vehicle', vehicle_id=vehicle.id) }}" class="btn btn-outline-warning">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        <a href="{{ url_for('expenses.add_expense', vehicle_id=vehicle.id) }}" class="btn btn-outline-info">
+            <i class="bi bi-receipt me-1"></i>Add Expense
+        </a>
+        <a href="{{ url_for('recon.add_recon_task', vehicle_id=vehicle.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-tools me-1"></i>Add Task
+        </a>
+        <form method="POST" action="{{ url_for('vehicles.clone_vehicle', vehicle_id=vehicle.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-secondary" title="Clone this vehicle">
+                <i class="bi bi-copy me-1"></i>Clone
+            </button>
+        </form>
+        {% if vehicle.status != 'Sold' %}
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#sellModal">
+            <i class="bi bi-cash me-1"></i>Mark Sold
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Financial Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Purchase Price</div>
+                <div class="fs-5 fw-bold">{{ vehicle.purchase_price | currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Recon Cost</div>
+                <div class="fs-5 fw-bold text-warning">{{ vehicle.recon_cost | currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Total In</div>
+                <div class="fs-5 fw-bold text-info">{{ vehicle.total_cost | currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        {% if vehicle.sale and vehicle.gross_profit is not none %}
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Gross Profit</div>
+                <div class="fs-5 fw-bold {% if vehicle.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ vehicle.gross_profit | currency }}
+                </div>
+            </div>
+        </div>
+        {% elif vehicle.asking_price %}
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Asking Price</div>
+                <div class="fs-5 fw-bold text-success">{{ vehicle.asking_price | currency }}</div>
+                {% if vehicle.asking_price %}
+                <div class="small text-muted">
+                    Potential: {{ (vehicle.asking_price | float - vehicle.total_cost) | currency }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Days on Lot</div>
+                <div class="fs-5 fw-bold text-{{ vehicle.days_on_lot | age_class }}">{{ vehicle.days_on_lot }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Secondary metrics row -->
+<div class="row g-2 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Days on Lot</div>
+                <div class="fw-bold text-{{ vehicle.days_on_lot | age_class }}">{{ vehicle.days_on_lot }}</div>
+            </div>
+        </div>
+    </div>
+    {% if vehicle.days_in_recon is not none %}
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Days in Recon</div>
+                <div class="fw-bold">{{ vehicle.days_in_recon }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if vehicle.lot_location %}
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Lot Location</div>
+                <div class="fw-bold">{{ vehicle.lot_location }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if vehicle.mileage %}
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Mileage</div>
+                <div class="fw-bold">{{ vehicle.mileage | number }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Photos Section -->
+<div class="card border-secondary mb-4">
+    <div class="card-header border-secondary fw-semibold d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-images me-2"></i>Photos <span class="badge bg-secondary">{{ photos | length }}</span></span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#photoUploadPanel">
+            <i class="bi bi-upload me-1"></i>Upload
+        </button>
+    </div>
+
+    <!-- Upload form (collapsed by default) -->
+    <div class="collapse" id="photoUploadPanel">
+        <div class="card-body border-bottom border-secondary">
+            <form method="POST" action="{{ url_for('photos.upload_photos', vehicle_id=vehicle.id) }}"
+                  enctype="multipart/form-data">
+                {{ photo_form.hidden_tag() }}
+                <div class="row g-2 align-items-end">
+                    <div class="col-sm-6">
+                        <label class="form-label small">Select Photos (jpg, png, gif, webp)</label>
+                        <input type="file" name="photos" class="form-control form-control-sm"
+                               accept="image/*" multiple required>
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label small">Caption (optional)</label>
+                        <input type="text" name="caption" class="form-control form-control-sm"
+                               placeholder="e.g. Front exterior" maxlength="100">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-sm btn-warning">
+                            <i class="bi bi-upload me-1"></i>Upload
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card-body">
+        {% if photos %}
+        <div class="row g-2">
+            {% for photo in photos %}
+            <div class="col-6 col-sm-4 col-md-3">
+                <div class="position-relative">
+                    <img src="{{ photo.url }}" alt="{{ photo.caption or 'Vehicle photo' }}"
+                         class="img-fluid rounded {% if photo.is_primary %}border border-warning border-2{% endif %}"
+                         style="height:140px;width:100%;object-fit:cover;cursor:pointer"
+                         data-bs-toggle="modal" data-bs-target="#photoModal{{ photo.id }}">
+                    {% if photo.is_primary %}
+                    <span class="position-absolute top-0 start-0 badge bg-warning text-dark m-1">
+                        <i class="bi bi-star-fill"></i> Primary
+                    </span>
+                    {% endif %}
+                    <div class="position-absolute bottom-0 end-0 d-flex gap-1 m-1">
+                        {% if not photo.is_primary %}
+                        <form method="POST" action="{{ url_for('photos.set_primary_photo', photo_id=photo.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-xs btn-warning p-1" title="Set as primary"><i class="bi bi-star"></i></button>
+                        </form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('photos.delete_photo', photo_id=photo.id) }}"
+                              onsubmit="return confirm('Delete this photo?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-xs btn-danger p-1" title="Delete"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+                {% if photo.caption %}
+                <div class="small text-muted mt-1 text-truncate">{{ photo.caption }}</div>
+                {% endif %}
+
+                <!-- Full-size modal -->
+                <div class="modal fade" id="photoModal{{ photo.id }}" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content bg-dark border-secondary">
+                            <div class="modal-header border-secondary py-2">
+                                <span class="text-muted small">{{ photo.caption or vehicle.display_name }}</span>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body p-1">
+                                <img src="{{ photo.url }}" class="img-fluid w-100 rounded" alt="{{ photo.caption or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-3">
+            <i class="bi bi-camera display-4"></i>
+            <p class="mt-2 small">No photos yet. Click Upload above to add some.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left: Details + Expenses -->
+    <div class="col-lg-7">
+
+        <!-- Vehicle Details -->
+        <div class="card border-secondary mb-4">
+            <div class="card-header border-secondary fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-info-circle me-2"></i>Vehicle Details</span>
+                <span class="badge bg-{{ vehicle.days_on_lot | age_class }}">{{ vehicle.days_on_lot }} days on lot</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    {% set detail_fields = [
+                        ('Year', vehicle.year),
+                        ('Make', vehicle.make),
+                        ('Model', vehicle.model),
+                        ('Trim', vehicle.trim),
+                        ('Body Type', vehicle.body_type),
+                        ('Exterior Color', vehicle.color_exterior),
+                        ('Interior Color', vehicle.color_interior),
+                        ('Mileage', (vehicle.mileage | number ~ ' miles') if vehicle.mileage else None),
+                        ('Transmission', vehicle.transmission),
+                        ('Engine', vehicle.engine),
+                        ('Fuel Type', vehicle.fuel_type),
+                        ('Drivetrain', vehicle.drivetrain),
+                        ('Condition', vehicle.condition),
+                        ('Lot Location', vehicle.lot_location),
+                        ('Purchase Source', vehicle.purchase_source),
+                        ('Source Detail', vehicle.purchase_source_detail),
+                        ('Purchase Date', vehicle.purchase_date.strftime('%B %d, %Y')),
+                        ('Title Status', vehicle.title_status),
+                        ('Title #', vehicle.title_number),
+                        ('Title In Hand', 'Yes' if vehicle.title_received else 'No'),
+                    ] %}
+                    {% for label, value in detail_fields %}
+                    {% if value %}
+                    <div class="col-6">
+                        <div class="text-muted small">{{ label }}</div>
+                        <div class="fw-semibold">{{ value }}</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                {% if vehicle.features %}
+                <hr class="border-secondary">
+                <div class="text-muted small mb-1">Features / Options</div>
+                <div class="d-flex flex-wrap gap-1">
+                    {% for feature in vehicle.features.split('\n') %}
+                    {% if feature.strip() %}
+                    <span class="badge bg-secondary">{{ feature.strip() }}</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if vehicle.notes %}
+                <hr class="border-secondary">
+                <div class="text-muted small mb-1">Notes</div>
+                <p class="mb-0 small">{{ vehicle.notes }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sale Info (if sold) -->
+        {% if vehicle.sale %}
+        <div class="card border-success mb-4">
+            <div class="card-header border-success bg-success bg-opacity-10 fw-semibold text-success">
+                <i class="bi bi-check-circle me-2"></i>Sale Record
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="text-muted small">Sale Date</div>
+                        <div class="fw-semibold">{{ vehicle.sale.sale_date.strftime('%B %d, %Y') }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small">Sale Price</div>
+                        <div class="fw-semibold fs-5">{{ vehicle.sale.sale_price | currency }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small">Sale Type</div>
+                        <div class="fw-semibold">{{ vehicle.sale.sale_type or '–' }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-muted small">Days on Lot</div>
+                        <div class="fw-semibold">{{ vehicle.days_on_lot }}</div>
+                    </div>
+                    {% if vehicle.sale.notes %}
+                    <div class="col-12">
+                        <div class="text-muted small">Notes</div>
+                        <div>{{ vehicle.sale.notes }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if current_user.is_manager_or_above() %}
+                <hr class="border-secondary">
+                <form method="POST" action="{{ url_for('sales.unmark_sold', vehicle_id=vehicle.id) }}"
+                      onsubmit="return confirm('Reverse this sale?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reverse Sale
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Expenses -->
+        <div class="card border-secondary mb-4">
+            <div class="card-header border-secondary fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-receipt me-2"></i>Expenses</span>
+                <a href="{{ url_for('expenses.add_expense', vehicle_id=vehicle.id) }}" class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-plus me-1"></i>Add
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if expenses %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Vendor</th>
+                                <th class="text-end">Amount</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exp in expenses %}
+                            <tr>
+                                <td class="text-muted small">{{ exp.expense_date.strftime('%m/%d/%y') }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ exp.category }}</span>
+                                    {% if exp.subcategory %}<br><span class="small text-muted">{{ exp.subcategory }}</span>{% endif %}
+                                </td>
+                                <td class="small">{{ exp.description or '' }}</td>
+                                <td class="small text-muted">{{ exp.vendor or '' }}</td>
+                                <td class="text-end fw-semibold">{{ exp.amount | currency }}</td>
+                                <td>
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="{{ url_for('expenses.edit_expense', expense_id=exp.id) }}"
+                                           class="btn btn-xs btn-outline-secondary btn-sm p-1" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        {% if exp.subcategory != 'Purchase Price' %}
+                                        <form method="POST" action="{{ url_for('expenses.delete_expense', expense_id=exp.id) }}"
+                                              onsubmit="return confirm('Delete this expense?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger p-1" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-secondary text-dark fw-bold">
+                                <td colspan="4">Total</td>
+                                <td class="text-end">{{ vehicle.total_cost | currency }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Expense breakdown by category -->
+                <div class="p-3 border-top border-secondary">
+                    <div class="small text-muted mb-2 fw-semibold">Breakdown by Category</div>
+                    {% for cat, data in expense_by_cat.items() %}
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small">{{ cat }}</span>
+                        <span class="small fw-semibold">{{ data.total | currency }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-3">No expenses recorded yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Recon Tasks -->
+    <div class="col-lg-5">
+        <div class="card border-secondary">
+            <div class="card-header border-secondary fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-tools me-2"></i>Reconditioning Workflow</span>
+                <a href="{{ url_for('recon.add_recon_task', vehicle_id=vehicle.id) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-plus me-1"></i>Add Task
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% set all_tasks = recon_by_stage.values() | sum(start=[]) %}
+                {% if all_tasks %}
+
+                {% for stage in recon_stages %}
+                {% set tasks = recon_by_stage.get(stage, []) %}
+                <div class="border-bottom border-secondary">
+                    <div class="px-3 py-2 d-flex justify-content-between align-items-center bg-secondary bg-opacity-10">
+                        <span class="fw-semibold small text-uppercase tracking-wide">
+                            {% if stage == 'Inspection' %}<i class="bi bi-clipboard-check me-1"></i>
+                            {% elif stage == 'Mechanical' %}<i class="bi bi-wrench me-1"></i>
+                            {% elif stage == 'Body & Paint' %}<i class="bi bi-brush me-1"></i>
+                            {% elif stage == 'Interior' %}<i class="bi bi-stars me-1"></i>
+                            {% elif stage == 'Final QC' %}<i class="bi bi-patch-check me-1"></i>
+                            {% endif %}
+                            {{ stage }}
+                        </span>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if tasks %}
+                            {% set done = tasks | selectattr('status', 'eq', 'Done') | list | length %}
+                            <span class="small text-muted">{{ done }}/{{ tasks | length }}</span>
+                            {% endif %}
+                            <a href="{{ url_for('recon.add_recon_task', vehicle_id=vehicle.id, stage=stage) }}"
+                               class="btn btn-xs btn-outline-secondary btn-sm p-1" title="Add task to {{ stage }}">
+                                <i class="bi bi-plus"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% if tasks %}
+                    <ul class="list-group list-group-flush">
+                        {% for task in tasks %}
+                        <li class="list-group-item bg-transparent py-2 px-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="fw-semibold small">{{ task.title }}</span>
+                                        <span class="badge badge-sm
+                                            {% if task.priority == 'Urgent' %}bg-danger
+                                            {% elif task.priority == 'High' %}bg-warning text-dark
+                                            {% else %}bg-secondary
+                                            {% endif %}">
+                                            {{ task.priority }}
+                                        </span>
+                                    </div>
+                                    {% if task.description %}
+                                    <div class="small text-muted">{{ task.description }}</div>
+                                    {% endif %}
+                                    <div class="d-flex gap-2 flex-wrap mt-1">
+                                        {% if task.vendor %}<span class="small text-muted"><i class="bi bi-shop me-1"></i>{{ task.vendor }}</span>{% endif %}
+                                        {% if task.estimated_cost %}<span class="small text-muted">Est: {{ task.estimated_cost | currency }}</span>{% endif %}
+                                        {% if task.actual_cost %}<span class="small text-warning">Act: {{ task.actual_cost | currency }}</span>{% endif %}
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-column align-items-end gap-1 ms-2">
+                                    <form method="POST" action="{{ url_for('recon.update_task_status', task_id=task.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <select name="status" class="form-select form-select-sm w-auto"
+                                                style="min-width:120px" onchange="this.form.submit()">
+                                            {% for s in ['Pending', 'In Progress', 'Done', 'Skipped'] %}
+                                            <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </form>
+                                    <div class="d-flex gap-1">
+                                        <a href="{{ url_for('recon.edit_recon_task', task_id=task.id) }}"
+                                           class="btn btn-sm btn-outline-secondary p-1"><i class="bi bi-pencil"></i></a>
+                                        <form method="POST" action="{{ url_for('recon.delete_recon_task', task_id=task.id) }}"
+                                              onsubmit="return confirm('Delete this task?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button class="btn btn-sm btn-outline-danger p-1"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center text-muted py-2 small">No tasks for this stage.</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-tools display-4"></i>
+                    <p class="mt-2 small">No recon tasks yet.</p>
+                    <a href="{{ url_for('recon.add_recon_task', vehicle_id=vehicle.id) }}" class="btn btn-sm btn-outline-secondary">Add First Task</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Log -->
+{% if activity_logs %}
+<div class="card border-secondary mb-4">
+    <div class="card-header border-secondary fw-semibold">
+        <i class="bi bi-clock-history me-2"></i>Activity Log
+    </div>
+    <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+            {% for log in activity_logs %}
+            <li class="list-group-item bg-transparent py-2 px-3 d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="fw-semibold small">{{ log.action }}</span>
+                    {% if log.details %}
+                    <span class="text-muted small ms-2">— {{ log.details }}</span>
+                    {% endif %}
+                    {% if log.user %}
+                    <span class="badge bg-secondary ms-2">{{ log.user.username }}</span>
+                    {% endif %}
+                </div>
+                <span class="text-muted small text-nowrap ms-3">
+                    {{ log.created_at.strftime('%m/%d/%y %H:%M') }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+<!-- Sell Modal -->
+{% if vehicle.status != 'Sold' %}
+<div class="modal fade" id="sellModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cash me-2"></i>Record Sale</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('sales.mark_sold', vehicle_id=vehicle.id) }}">
+                {{ sale_form.hidden_tag() }}
+                {{ sale_form.vehicle_id() }}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="text-muted small">Vehicle</div>
+                        <div class="fw-bold fs-5">{{ vehicle.display_name }}</div>
+                        <div class="text-muted small">Total cost in: {{ vehicle.total_cost | currency }}</div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">Sale Date <span class="text-danger">*</span></label>
+                            {{ sale_form.sale_date(class="form-control") }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Sale Type</label>
+                            {{ sale_form.sale_type(class="form-select") }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Sale Price <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ sale_form.sale_price(class="form-control", id="salePriceInput",
+                                   value=vehicle.asking_price | float if vehicle.asking_price else '') }}
+                            </div>
+                            <div class="form-text">Profit preview: <span id="profitPreview" class="fw-bold"></span></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            {{ sale_form.notes(class="form-control", rows=2) }}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success fw-bold">
+                        <i class="bi bi-check-circle me-1"></i>Confirm Sale
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live profit preview in sell modal
+const totalCost = {{ vehicle.total_cost }};
+const priceInput = document.getElementById('salePriceInput');
+const profitPreview = document.getElementById('profitPreview');
+
+function updateProfit() {
+    if (!priceInput || !profitPreview) return;
+    const price = parseFloat(priceInput.value) || 0;
+    const profit = price - totalCost;
+    profitPreview.textContent = '$' + profit.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    profitPreview.className = 'fw-bold ' + (profit >= 0 ? 'text-success' : 'text-danger');
+}
+
+if (priceInput) {
+    priceInput.addEventListener('input', updateProfit);
+    updateProfit();
+}
+</script>
+{% endblock %}

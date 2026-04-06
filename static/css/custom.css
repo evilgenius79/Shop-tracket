@@ -1,0 +1,130 @@
+/* LotTracker - Custom Styles */
+
+:root {
+    --lt-warning: #ffc107;
+    --lt-bg-dark: #1a1a2e;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: #121212;
+}
+
+/* Navbar */
+.navbar-brand {
+    font-size: 1.3rem;
+    letter-spacing: -0.5px;
+}
+
+/* Status badge styles */
+.status-in-recon     { background-color: #0dcaf0; color: #000; }
+.status-available    { background-color: #198754; color: #fff; }
+.status-pending-sale { background-color: #fd7e14; color: #000; }
+.status-sold         { background-color: #6c757d; color: #fff; }
+.status-wholesale    { background-color: #6f42c1; color: #fff; }
+.status-on-hold      { background-color: #ffc107; color: #000; }
+.status-junked       { background-color: #dc3545; color: #fff; }
+
+/* Cards */
+.card {
+    border-radius: 0.5rem;
+}
+
+.card-header {
+    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
+}
+
+/* Tables */
+.table-dark {
+    --bs-table-bg: #1e1e1e;
+    --bs-table-hover-bg: #2a2a2a;
+}
+
+.table-dark thead th {
+    background-color: #2d2d2d;
+    color: #adb5bd;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #444;
+}
+
+tfoot td {
+    font-size: 0.85rem;
+}
+
+/* Age badges */
+.badge.bg-success { background-color: #198754 !important; }
+.badge.bg-info    { background-color: #0dcaf0 !important; color: #000 !important; }
+.badge.bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+.badge.bg-danger  { background-color: #dc3545 !important; }
+
+/* Forms */
+.form-control:focus,
+.form-select:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.15);
+}
+
+/* Dashboard KPI cards */
+.display-5 {
+    font-size: 2.5rem;
+}
+
+/* Breadcrumb */
+.breadcrumb-item a {
+    color: #adb5bd;
+    text-decoration: none;
+}
+.breadcrumb-item a:hover {
+    color: #ffc107;
+}
+.breadcrumb-item.active {
+    color: #6c757d;
+}
+.breadcrumb-item + .breadcrumb-item::before {
+    color: #6c757d;
+}
+
+/* Recon workflow */
+.tracking-wide {
+    letter-spacing: 0.08em;
+}
+
+/* Small buttons */
+.btn-xs {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.75rem;
+}
+
+/* Scrollable tables on mobile */
+@media (max-width: 576px) {
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+}
+
+/* Sidebar-like left panel on detail page */
+.detail-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #6c757d;
+    letter-spacing: 0.5px;
+}
+
+/* Footer */
+footer {
+    padding: 1rem 0;
+    color: #495057;
+    font-size: 0.8rem;
+    border-top: 1px solid #2d2d2d;
+    margin-top: 2rem;
+}
+
+/* Print styles */
+@media print {
+    .navbar, .btn, form { display: none !important; }
+    .card { border: 1px solid #dee2e6 !important; }
+    body { background: #fff !important; color: #000 !important; }
+}

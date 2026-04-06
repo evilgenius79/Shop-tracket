@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Users{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0"><i class="bi bi-people me-2 text-warning"></i>User Management</h2>
+    <a href="{{ url_for('users.add_user') }}" class="btn btn-warning">
+        <i class="bi bi-person-plus me-1"></i>Add User
+    </a>
+</div>
+
+<div class="card border-secondary">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td class="fw-semibold">
+                            {{ user.username }}
+                            {% if user.id == current_user.id %}
+                            <span class="badge bg-info ms-1">You</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ user.email }}</td>
+                        <td>
+                            <span class="badge
+                                {% if user.role == 'admin' %}bg-danger
+                                {% elif user.role == 'manager' %}bg-warning text-dark
+                                {% else %}bg-secondary{% endif %}">
+                                {{ user.role }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if user.is_active %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i>Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {{ user.last_login.strftime('%m/%d/%y %H:%M') if user.last_login else 'Never' }}
+                        </td>
+                        <td class="text-muted small">{{ user.created_at.strftime('%m/%d/%y') }}</td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <a href="{{ url_for('users.edit_user', user_id=user.id) }}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% if user.id != current_user.id %}
+                                <form method="POST" action="{{ url_for('users.toggle_user', user_id=user.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm
+                                        {% if user.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                                        title="{{ 'Deactivate' if user.is_active else 'Activate' }}">
+                                        <i class="bi bi-{% if user.is_active %}pause{% else %}play{% endif %}"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <h6 class="text-muted">Role Permissions</h6>
+    <div class="row g-2">
+        <div class="col-md-4">
+            <div class="card border-secondary">
+                <div class="card-body py-2 px-3">
+                    <span class="badge bg-secondary me-2">Staff</span>
+                    <span class="small text-muted">View, add vehicles & expenses, manage recon tasks</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-secondary">
+                <div class="card-body py-2 px-3">
+                    <span class="badge bg-warning text-dark me-2">Manager</span>
+                    <span class="small text-muted">All staff + delete vehicles, reverse sales</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-secondary">
+                <div class="card-body py-2 px-3">
+                    <span class="badge bg-danger me-2">Admin</span>
+                    <span class="small text-muted">All manager + user management</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

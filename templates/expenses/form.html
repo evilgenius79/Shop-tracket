@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{{ url_for('vehicles.list_vehicles') }}">Inventory</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id) }}">{{ vehicle.stock_number }}</a></li>
+                <li class="breadcrumb-item active">{{ title }}</li>
+            </ol>
+        </nav>
+        <h2 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-warning"></i>{{ title }}</h2>
+        <p class="text-muted mb-0">{{ vehicle.display_name }}</p>
+    </div>
+    <a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Vehicle
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card border-secondary">
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    {{ form.vehicle_id() }}
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Category <span class="text-danger">*</span></label>
+                            {{ form.category_sub(class="form-select" + (" is-invalid" if form.category_sub.errors else "")) }}
+                            {% for e in form.category_sub.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            {{ form.description(class="form-control", placeholder="Brief description of work/expense") }}
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ form.amount(class="form-control" + (" is-invalid" if form.amount.errors else ""), placeholder="0.00") }}
+                            </div>
+                            {% for e in form.amount.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">Date <span class="text-danger">*</span></label>
+                            {{ form.expense_date(class="form-control" + (" is-invalid" if form.expense_date.errors else "")) }}
+                            {% for e in form.expense_date.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-sm-8">
+                            <label class="form-label">Vendor / Shop</label>
+                            {{ form.vendor(class="form-control", placeholder="Shop name, vendor, or supplier") }}
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label">Invoice #</label>
+                            {{ form.invoice_number(class="form-control", placeholder="INV-001") }}
+                        </div>
+                    </div>
+                    <hr class="border-secondary">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-warning fw-bold">
+                            <i class="bi bi-check-lg me-1"></i>Save Expense
+                        </button>
+                        <a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id) }}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Running total info -->
+        <div class="card border-secondary mt-3">
+            <div class="card-body py-2">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="small text-muted">Purchase</div>
+                        <div class="fw-semibold">{{ vehicle.purchase_price | currency }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Recon So Far</div>
+                        <div class="fw-semibold text-warning">{{ vehicle.recon_cost | currency }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Total In</div>
+                        <div class="fw-semibold text-info">{{ vehicle.total_cost | currency }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

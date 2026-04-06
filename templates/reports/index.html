@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+
+<h2 class="fw-bold mb-4"><i class="bi bi-bar-chart-line me-2 text-warning"></i>Reports</h2>
+
+<div class="row g-4">
+    <div class="col-sm-6 col-md-4">
+        <a href="{{ url_for('reports.inventory_report') }}" class="card border-secondary text-decoration-none h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-list-ul fs-1 text-primary"></i>
+                <div>
+                    <h5 class="mb-1">Inventory Report</h5>
+                    <p class="text-muted mb-0 small">Current inventory with costs and status.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-4">
+        <a href="{{ url_for('reports.profit_loss') }}" class="card border-secondary text-decoration-none h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-cash-stack fs-1 text-success"></i>
+                <div>
+                    <h5 class="mb-1">Profit & Loss</h5>
+                    <p class="text-muted mb-0 small">Sold vehicles with gross profit analysis.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-4">
+        <a href="{{ url_for('reports.aging_report') }}" class="card border-secondary text-decoration-none h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-hourglass-split fs-1 text-warning"></i>
+                <div>
+                    <h5 class="mb-1">Aging Report</h5>
+                    <p class="text-muted mb-0 small">Vehicles grouped by days on lot.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-4">
+        <a href="{{ url_for('reports.expense_report') }}" class="card border-secondary text-decoration-none h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-receipt fs-1 text-info"></i>
+                <div>
+                    <h5 class="mb-1">Expense Report</h5>
+                    <p class="text-muted mb-0 small">All expenses by category and period.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-4">
+        <a href="{{ url_for('reports.performance_report') }}" class="card border-secondary text-decoration-none h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-graph-up fs-1 text-danger"></i>
+                <div>
+                    <h5 class="mb-1">Performance</h5>
+                    <p class="text-muted mb-0 small">Best sellers by make and acquisition source.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-md-4">
+        <div class="card border-secondary h-100">
+            <div class="card-body">
+                <h5 class="mb-2"><i class="bi bi-download me-2 text-secondary"></i>Export Data</h5>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('reports.export_inventory_csv') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-file-earmark-csv me-1"></i>Inventory CSV
+                    </a>
+                    <a href="{{ url_for('reports.export_sales_csv') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-file-earmark-csv me-1"></i>Sales CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

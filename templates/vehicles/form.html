@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0"><i class="bi bi-car-front me-2 text-warning"></i>{{ title }}</h2>
+    <a href="{{ url_for('vehicles.list_vehicles') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Inventory
+    </a>
+</div>
+
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="row g-4">
+
+        <!-- Left column -->
+        <div class="col-md-8">
+
+            <!-- Core Identity -->
+            <div class="card border-secondary mb-3">
+                <div class="card-header border-secondary fw-semibold">
+                    <i class="bi bi-card-text me-2"></i>Vehicle Identity
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-4">
+                            <label class="form-label">{{ form.stock_number.label.text }} <span class="text-danger">*</span></label>
+                            {{ form.stock_number(class="form-control" + (" is-invalid" if form.stock_number.errors else "")) }}
+                            {% for e in form.stock_number.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-sm-8">
+                            <label class="form-label">{{ form.vin.label.text }}</label>
+                            {{ form.vin(class="form-control font-monospace" + (" is-invalid" if form.vin.errors else ""), placeholder="17-character VIN", maxlength=17, style="text-transform:uppercase") }}
+                            {% for e in form.vin.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-sm-2">
+                            <label class="form-label">Year <span class="text-danger">*</span></label>
+                            {{ form.year(class="form-select") }}
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label">Make <span class="text-danger">*</span></label>
+                            {{ form.make(class="form-control" + (" is-invalid" if form.make.errors else ""), placeholder="e.g. Toyota") }}
+                            {% for e in form.make.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label">Model <span class="text-danger">*</span></label>
+                            {{ form.model(class="form-control" + (" is-invalid" if form.model.errors else ""), placeholder="e.g. Camry") }}
+                            {% for e in form.model.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-sm-2">
+                            <label class="form-label">Trim</label>
+                            {{ form.trim(class="form-control", placeholder="e.g. XLE") }}
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label">Body Type</label>
+                            {{ form.body_type(class="form-select") }}
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label">Exterior Color</label>
+                            {{ form.color_exterior(class="form-control", placeholder="e.g. Pearl White") }}
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label">Interior Color</label>
+                            {{ form.color_interior(class="form-control", placeholder="e.g. Black Leather") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Specs -->
+            <div class="card border-secondary mb-3">
+                <div class="card-header border-secondary fw-semibold">
+                    <i class="bi bi-gear me-2"></i>Specifications
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-3">
+                            <label class="form-label">Mileage</label>
+                            {{ form.mileage(class="form-control", placeholder="0") }}
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label">Transmission</label>
+                            {{ form.transmission(class="form-select") }}
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label">Fuel Type</label>
+                            {{ form.fuel_type(class="form-select") }}
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label">Drivetrain</label>
+                            {{ form.drivetrain(class="form-select") }}
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">Engine</label>
+                            {{ form.engine(class="form-control", placeholder="e.g. 2.5L 4-cyl, 3.5L V6") }}
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label">Condition</label>
+                            {{ form.condition(class="form-select") }}
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label">Lot Location</label>
+                            {{ form.lot_location(class="form-control", placeholder="e.g. Row A, Bay 3") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features & Notes -->
+            <div class="card border-secondary mb-3">
+                <div class="card-header border-secondary fw-semibold">
+                    <i class="bi bi-stars me-2"></i>Features & Notes
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Features / Options
+                                <span class="text-muted small">(one per line)</span>
+                            </label>
+                            {{ form.features(class="form-control", rows=4, placeholder="Leather Seats\nSunroof\nNavigation\nBackup Camera\nHeated Seats") }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            {{ form.notes(class="form-control", rows=3, placeholder="Any additional notes about this vehicle...") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right column -->
+        <div class="col-md-4">
+
+            <!-- Acquisition -->
+            <div class="card border-secondary mb-3">
+                <div class="card-header border-secondary fw-semibold">
+                    <i class="bi bi-bag-check me-2"></i>Acquisition
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Purchase Date <span class="text-danger">*</span></label>
+                            {{ form.purchase_date(class="form-control" + (" is-invalid" if form.purchase_date.errors else "")) }}
+                            {% for e in form.purchase_date.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Purchase Price <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ form.purchase_price(class="form-control" + (" is-invalid" if form.purchase_price.errors else ""), placeholder="0.00") }}
+                            </div>
+                            {% for e in form.purchase_price.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Source</label>
+                            {{ form.purchase_source(class="form-select") }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Source Detail</label>
+                            {{ form.purchase_source_detail(class="form-control", placeholder="e.g. Manheim Atlanta") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Title -->
+            <div class="card border-secondary mb-3">
+                <div class="card-header border-secondary fw-semibold">
+                    <i class="bi bi-file-earmark-text me-2"></i>Title
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Title Status</label>
+                            {{ form.title_status(class="form-select") }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Title Number</label>
+                            {{ form.title_number(class="form-control", placeholder="Title number") }}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.title_received(class="form-check-input") }}
+                                <label class="form-check-label">{{ form.title_received.label.text }}</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status & Pricing -->
+            <div class="card border-secondary mb-3">
+                <div class="card-header border-secondary fw-semibold">
+                    <i class="bi bi-tag me-2"></i>Status & Pricing
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Status <span class="text-danger">*</span></label>
+                            {{ form.status(class="form-select") }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Asking Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ form.asking_price(class="form-control", placeholder="0.00") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-warning fw-bold">
+                    <i class="bi bi-check-lg me-1"></i>Save Vehicle
+                </button>
+                {% if vehicle %}
+                <a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id) }}" class="btn btn-outline-secondary">
+                    Cancel
+                </a>
+                {% else %}
+                <a href="{{ url_for('vehicles.list_vehicles') }}" class="btn btn-outline-secondary">Cancel</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
