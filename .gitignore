@@ -4,3 +4,5 @@ __pycache__/
 static/uploads/
 *.log
 venv/
+*_cookies.txt
+cookies.txt
