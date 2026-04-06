@@ -30,8 +30,14 @@
                         </div>
                         <div class="col-sm-8">
                             <label class="form-label">{{ form.vin.label.text }}</label>
-                            {{ form.vin(class="form-control font-monospace" + (" is-invalid" if form.vin.errors else ""), placeholder="17-character VIN", maxlength=17, style="text-transform:uppercase") }}
-                            {% for e in form.vin.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                            <div class="input-group">
+                                {{ form.vin(class="form-control font-monospace" + (" is-invalid" if form.vin.errors else ""), placeholder="17-character VIN", maxlength=17, style="text-transform:uppercase", id="vin-input") }}
+                                <button type="button" class="btn btn-outline-info" id="vin-decode-btn" title="Look up vehicle info from NHTSA database">
+                                    <i class="bi bi-search me-1" id="vin-decode-icon"></i>Decode VIN
+                                </button>
+                            </div>
+                            {% for e in form.vin.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+                            <div id="vin-status" class="mt-1 small"></div>
                         </div>
                         <div class="col-sm-2">
                             <label class="form-label">Year <span class="text-danger">*</span></label>
@@ -225,4 +231,204 @@
         </div>
     </div>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    'use strict';
+
+    // ── NHTSA value fragments → our select option values ──────────────────
+    const BODY_MAP = [
+        ['Sedan',           'Sedan'],
+        ['Hatchback',       'Hatchback'],
+        ['Liftback',        'Hatchback'],
+        ['Wagon',           'Wagon'],
+        ['Sport Utility',   'SUV'],
+        ['SUV',             'SUV'],
+        ['Crossover',       'Crossover'],
+        ['Pickup',          'Pickup Truck'],
+        ['Minivan',         'Minivan'],
+        ['Cargo Van',       'Cargo Van'],
+        ['Van',             'Van'],
+        ['Coupe',           'Coupe'],
+        ['Convertible',     'Convertible'],
+        ['Cabriolet',       'Convertible'],
+        ['Truck',           'Truck'],
+        ['Box',             'Box Truck'],
+    ];
+
+    const FUEL_MAP = [
+        ['Plug-In Hybrid',  'Plug-in Hybrid'],
+        ['Plug-in Hybrid',  'Plug-in Hybrid'],
+        ['PHEV',            'Plug-in Hybrid'],
+        ['Hybrid',          'Hybrid'],
+        ['Gasoline',        'Gasoline'],
+        ['Diesel',          'Diesel'],
+        ['Electric',        'Electric'],
+        ['Flex',            'Flex Fuel'],
+        ['Natural Gas',     'Other'],
+    ];
+
+    const DRIVE_MAP = [
+        ['Front-Wheel',     'FWD'],
+        ['FWD',             'FWD'],
+        ['Rear-Wheel',      'RWD'],
+        ['RWD',             'RWD'],
+        ['All-Wheel',       'AWD'],
+        ['AWD',             'AWD'],
+        ['4-Wheel',         '4WD'],
+        ['4WD',             '4WD'],
+        ['4x4',             '4WD'],
+        ['2WD',             'RWD'],
+    ];
+
+    const TRANS_MAP = [
+        ['Continuously Variable', 'CVT'],
+        ['CVT',             'CVT'],
+        ['Dual-Clutch',     'Semi-Auto'],
+        ['DCT',             'Semi-Auto'],
+        ['Automatic',       'Automatic'],
+        ['Manual',          'Manual'],
+        ['Standard',        'Manual'],
+    ];
+
+    function mapValue(raw, table) {
+        if (!raw) return null;
+        const u = raw.toUpperCase();
+        for (const [frag, val] of table) {
+            if (u.includes(frag.toUpperCase())) return val;
+        }
+        return null;
+    }
+
+    function setSelect(id, value) {
+        if (!value) return false;
+        const el = document.getElementById(id);
+        if (!el) return false;
+        for (const opt of el.options) {
+            if (opt.value === value) { el.value = value; return true; }
+        }
+        return false;
+    }
+
+    // Only fills a text input if it is currently empty
+    function setField(id, value) {
+        if (!value) return false;
+        const el = document.getElementById(id);
+        if (!el || el.value.trim()) return false;
+        el.value = value;
+        el.classList.add('vin-filled');
+        return true;
+    }
+
+    function parseNhtsa(results) {
+        const map = {};
+        for (const r of results) {
+            if (r.Value && r.Value.trim() && r.Value !== 'Not Applicable') {
+                map[r.Variable] = r.Value.trim();
+            }
+        }
+        return map;
+    }
+
+    async function decodeVin(vin) {
+        const btn    = document.getElementById('vin-decode-btn');
+        const icon   = document.getElementById('vin-decode-icon');
+        const status = document.getElementById('vin-status');
+
+        btn.disabled = true;
+        icon.className = 'spinner-border spinner-border-sm me-1';
+        status.innerHTML = '<span class="text-muted">Looking up VIN…</span>';
+
+        try {
+            const res = await fetch(
+                `https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${encodeURIComponent(vin)}?format=json`,
+                { signal: AbortSignal.timeout(8000) }
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            const f = parseNhtsa(data.Results || []);
+
+            if (f['Error Code'] && f['Error Code'] !== '0') {
+                status.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>${f['Error Text'] || 'VIN not found in NHTSA database.'}</span>`;
+                return;
+            }
+
+            const filled = [];
+
+            // Year (select field)
+            if (f['Model Year']) {
+                const el = document.getElementById('year');
+                if (el) { el.value = f['Model Year']; filled.push('Year'); }
+            }
+
+            // Text fields — only written if currently empty
+            if (setField('make',  f['Make']))                        filled.push('Make');
+            if (setField('model', f['Model']))                       filled.push('Model');
+            if (setField('trim',  f['Series'] || f['Trim']))         filled.push('Trim');
+
+            // Build engine string e.g. "2.5L 4-cyl"
+            const disp = f['Displacement (L)'];
+            const cyls = f['Engine Number of Cylinders'];
+            let eng = '';
+            if (disp) eng += parseFloat(disp).toFixed(1) + 'L';
+            if (cyls) eng += (eng ? ' ' : '') + cyls + '-cyl';
+            if (!eng)  eng = f['Engine Model'] || '';
+            if (setField('engine', eng)) filled.push('Engine');
+
+            // Select fields
+            if (setSelect('body_type',    mapValue(f['Body Class'],          BODY_MAP)))  filled.push('Body Type');
+            if (setSelect('fuel_type',    mapValue(f['Fuel Type - Primary'],  FUEL_MAP))) filled.push('Fuel Type');
+            if (setSelect('drivetrain',   mapValue(f['Drive Type'],           DRIVE_MAP)))filled.push('Drivetrain');
+            if (setSelect('transmission', mapValue(f['Transmission Style'],   TRANS_MAP)))filled.push('Transmission');
+
+            if (filled.length) {
+                status.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>Filled in: ${filled.join(', ')}</span>`;
+            } else {
+                status.innerHTML = `<span class="text-info"><i class="bi bi-info-circle me-1"></i>VIN found but all matching fields already have data.</span>`;
+            }
+
+        } catch (err) {
+            if (err.name === 'TimeoutError') {
+                status.innerHTML = '<span class="text-danger"><i class="bi bi-wifi-off me-1"></i>Request timed out — check internet connection.</span>';
+            } else {
+                status.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Decode failed: ${err.message}</span>`;
+            }
+        } finally {
+            btn.disabled = false;
+            icon.className = 'bi bi-search me-1';
+        }
+    }
+
+    const vinInput  = document.getElementById('vin-input');
+    const decodeBtn = document.getElementById('vin-decode-btn');
+
+    // Auto-decode when VIN field loses focus with exactly 17 characters
+    vinInput.addEventListener('blur', function () {
+        const v = this.value.trim().toUpperCase();
+        if (v.length === 17) decodeVin(v);
+    });
+
+    // Manual decode button
+    decodeBtn.addEventListener('click', function () {
+        const v = vinInput.value.trim().toUpperCase();
+        if (v.length !== 17) {
+            document.getElementById('vin-status').innerHTML =
+                '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>VIN must be exactly 17 characters.</span>';
+            return;
+        }
+        decodeVin(v);
+    });
+
+    // Clear status when user edits the VIN
+    vinInput.addEventListener('input', function () {
+        document.getElementById('vin-status').innerHTML = '';
+    });
+})();
+</script>
+
+<style>
+.vin-filled { border-color: #0dcaf0 !important; transition: border-color 0.3s; }
+</style>
 {% endblock %}
