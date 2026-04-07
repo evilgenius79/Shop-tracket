@@ -30,6 +30,9 @@
         <a href="{{ url_for('recon.add_recon_task', vehicle_id=vehicle.id) }}" class="btn btn-outline-secondary">
             <i class="bi bi-tools me-1"></i>Add Task
         </a>
+        <a href="{{ url_for('vehicles.vehicle_sticker', vehicle_id=vehicle.id) }}" class="btn btn-outline-secondary" target="_blank" title="Print window sticker">
+            <i class="bi bi-printer me-1"></i>Sticker
+        </a>
         <form method="POST" action="{{ url_for('vehicles.clone_vehicle', vehicle_id=vehicle.id) }}" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-secondary" title="Clone this vehicle">
@@ -78,6 +81,9 @@
                 <div class="fs-5 fw-bold {% if vehicle.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
                     {{ vehicle.gross_profit | currency }}
                 </div>
+                {% if vehicle.gross_margin_pct is not none %}
+                <div class="small text-muted">{{ vehicle.gross_margin_pct }}% margin</div>
+                {% endif %}
             </div>
         </div>
         {% elif vehicle.asking_price %}
@@ -113,6 +119,16 @@
             </div>
         </div>
     </div>
+    {% if vehicle.status not in ('Sold', 'Wholesale', 'Junked') %}
+    <div class="col-6 col-md-3">
+        <div class="card border-secondary text-center">
+            <div class="card-body py-2">
+                <div class="small text-muted">Daily Cost</div>
+                <div class="fw-bold text-warning">{{ vehicle.daily_cost | currency }}/day</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     {% if vehicle.days_in_recon is not none %}
     <div class="col-6 col-md-3">
         <div class="card border-secondary text-center">
@@ -532,6 +548,42 @@
         </div>
     </div>
 </div>
+
+<!-- Price History -->
+{% if price_history %}
+<div class="card border-secondary mb-4">
+    <div class="card-header border-secondary fw-semibold">
+        <i class="bi bi-graph-down-arrow me-2"></i>Asking Price History
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-dark table-sm mb-0">
+            <thead class="table-secondary text-dark">
+                <tr>
+                    <th>Date</th>
+                    <th class="text-end">Old Price</th>
+                    <th class="text-end">New Price</th>
+                    <th class="text-end">Change</th>
+                    <th>By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ph in price_history %}
+                {% set change = (ph.new_price | float) - (ph.old_price | float if ph.old_price else 0) %}
+                <tr>
+                    <td class="text-muted small">{{ ph.changed_at.strftime('%m/%d/%y %I:%M %p') }}</td>
+                    <td class="text-end text-muted">{{ ph.old_price | currency if ph.old_price else '—' }}</td>
+                    <td class="text-end fw-semibold">{{ ph.new_price | currency }}</td>
+                    <td class="text-end {% if change < 0 %}text-success{% elif change > 0 %}text-danger{% else %}text-muted{% endif %}">
+                        {% if ph.old_price %}{{ '%+,.2f' | format(change) | replace('+', '+$') | replace('-', '-$') }}{% else %}—{% endif %}
+                    </td>
+                    <td class="text-muted small">{{ ph.changed_by.username if ph.changed_by else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 
 <!-- Activity Log -->
 {% if activity_logs %}

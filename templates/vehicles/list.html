@@ -115,7 +115,20 @@
                             <td class="text-muted">{{ v.purchase_date.strftime('%m/%d/%y') }}</td>
                             <td class="text-end">{{ v.purchase_price | currency }}</td>
                             <td class="text-end fw-semibold">{{ v.total_cost | currency }}</td>
-                            <td class="text-end text-success">{{ v.asking_price | currency if v.asking_price else '–' }}</td>
+                            <td class="text-end">
+                                <span class="asking-display text-success" data-vid="{{ v.id }}">
+                                    {{ v.asking_price | currency if v.asking_price else '–' }}
+                                </span>
+                                <button class="btn btn-link btn-sm p-0 ms-1 text-muted asking-edit-btn"
+                                        data-vid="{{ v.id }}" data-current="{{ v.asking_price | float if v.asking_price else 0 }}"
+                                        title="Edit asking price"><i class="bi bi-pencil-fill" style="font-size:.65rem"></i></button>
+                                <span class="asking-input-wrap d-none" data-vid="{{ v.id }}">
+                                    <input type="number" step="0.01" min="0" class="form-control form-control-sm d-inline-block asking-input"
+                                           style="width:110px" data-vid="{{ v.id }}">
+                                    <button class="btn btn-sm btn-success asking-save" data-vid="{{ v.id }}">✓</button>
+                                    <button class="btn btn-sm btn-outline-secondary asking-cancel" data-vid="{{ v.id }}">✕</button>
+                                </span>
+                            </td>
                             <td>
                                 <span class="badge bg-{{ v.days_on_lot | age_class }}">{{ v.days_on_lot }}d</span>
                             </td>
@@ -128,7 +141,15 @@
                                     <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
                                         <li><a class="dropdown-item" href="{{ url_for('vehicles.vehicle_detail', vehicle_id=v.id) }}"><i class="bi bi-eye me-2"></i>View</a></li>
                                         <li><a class="dropdown-item" href="{{ url_for('vehicles.edit_vehicle', vehicle_id=v.id) }}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('vehicles.vehicle_sticker', vehicle_id=v.id) }}" target="_blank"><i class="bi bi-printer me-2"></i>Print Sticker</a></li>
                                         <li><a class="dropdown-item" href="{{ url_for('expenses.add_expense', vehicle_id=v.id) }}"><i class="bi bi-receipt me-2"></i>Add Expense</a></li>
+                                        <li>
+                                            <button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#noteModal"
+                                                    data-vid="{{ v.id }}" data-note="{{ v.notes or '' }}"
+                                                    data-name="{{ v.display_name }}">
+                                                <i class="bi bi-sticky me-2"></i>Quick Note{% if v.notes %} <i class="bi bi-circle-fill text-warning ms-1" style="font-size:.4rem"></i>{% endif %}
+                                            </button>
+                                        </li>
                                         <li>
                                             <form method="POST" action="{{ url_for('vehicles.clone_vehicle', vehicle_id=v.id) }}">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -192,6 +213,26 @@
 </nav>
 {% endif %}
 
+<!-- Quick Note Modal -->
+<div class="modal fade" id="noteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-sticky me-2"></i>Quick Note — <span id="noteVehicleName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <textarea id="noteText" class="form-control bg-dark text-light border-secondary" rows="4"
+                          placeholder="Add a note about this vehicle..."></textarea>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="noteSaveBtn">Save Note</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% else %}
 <div class="text-center py-5 text-muted">
     <i class="bi bi-car-front display-1"></i>
@@ -210,6 +251,7 @@
 
 {% block scripts %}
 <script>
+// ── Bulk selection ──────────────────────────────────────────────────────────
 const selectAll = document.getElementById('selectAll');
 const bulkBar  = document.getElementById('bulkBar');
 const bulkCount = document.getElementById('bulkCount');
@@ -241,5 +283,90 @@ if (selectAll) {
 document.addEventListener('change', e => {
     if (e.target.classList.contains('row-check')) updateBulkBar();
 });
+
+// ── Inline asking price edit ────────────────────────────────────────────────
+document.querySelectorAll('.asking-edit-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+        const vid = this.dataset.vid;
+        const current = parseFloat(this.dataset.current) || 0;
+        document.querySelector(`.asking-display[data-vid="${vid}"]`).classList.add('d-none');
+        this.classList.add('d-none');
+        const wrap = document.querySelector(`.asking-input-wrap[data-vid="${vid}"]`);
+        wrap.classList.remove('d-none');
+        const inp = wrap.querySelector('.asking-input');
+        inp.value = current > 0 ? current.toFixed(2) : '';
+        inp.focus();
+    });
+});
+
+function cancelAskingEdit(vid) {
+    document.querySelector(`.asking-display[data-vid="${vid}"]`).classList.remove('d-none');
+    document.querySelector(`.asking-edit-btn[data-vid="${vid}"]`).classList.remove('d-none');
+    document.querySelector(`.asking-input-wrap[data-vid="${vid}"]`).classList.add('d-none');
+}
+
+async function saveAskingPrice(vid) {
+    const inp = document.querySelector(`.asking-input[data-vid="${vid}"]`);
+    const price = parseFloat(inp.value);
+    if (isNaN(price) || price < 0) { inp.classList.add('is-invalid'); return; }
+    inp.classList.remove('is-invalid');
+
+    const resp = await fetch(`/api/vehicles/${vid}/asking-price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+        body: JSON.stringify({ asking_price: price })
+    });
+    if (resp.ok) {
+        const data = await resp.json();
+        const display = document.querySelector(`.asking-display[data-vid="${vid}"]`);
+        display.textContent = data.formatted;
+        display.style.color = '';
+        display.classList.add('text-success');
+        document.querySelector(`.asking-edit-btn[data-vid="${vid}"]`).dataset.current = data.asking_price;
+    }
+    cancelAskingEdit(vid);
+}
+
+document.querySelectorAll('.asking-save').forEach(btn => {
+    btn.addEventListener('click', () => saveAskingPrice(btn.dataset.vid));
+});
+document.querySelectorAll('.asking-cancel').forEach(btn => {
+    btn.addEventListener('click', () => cancelAskingEdit(btn.dataset.vid));
+});
+document.querySelectorAll('.asking-input').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') saveAskingPrice(inp.dataset.vid);
+        if (e.key === 'Escape') cancelAskingEdit(inp.dataset.vid);
+    });
+});
+
+// ── Quick Note modal ────────────────────────────────────────────────────────
+let _noteVid = null;
+const noteModal = document.getElementById('noteModal');
+if (noteModal) {
+    noteModal.addEventListener('show.bs.modal', function (e) {
+        const btn = e.relatedTarget;
+        _noteVid = btn.dataset.vid;
+        document.getElementById('noteVehicleName').textContent = btn.dataset.name;
+        document.getElementById('noteText').value = btn.dataset.note || '';
+    });
+
+    document.getElementById('noteSaveBtn').addEventListener('click', async function () {
+        const note = document.getElementById('noteText').value.trim();
+        const resp = await fetch(`/api/vehicles/${_noteVid}/note`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json',
+                       'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+            body: JSON.stringify({ note })
+        });
+        if (resp.ok) {
+            // Update the dropdown button's data-note so it reflects the new value without reload
+            const dropBtn = document.querySelector(`button[data-bs-target="#noteModal"][data-vid="${_noteVid}"]`);
+            if (dropBtn) dropBtn.dataset.note = note;
+            bootstrap.Modal.getInstance(noteModal).hide();
+        }
+    });
+}
 </script>
 {% endblock %}

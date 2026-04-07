@@ -1,0 +1,3 @@
+stock_number,vin,year,make,model,trim,body_type,color_exterior,mileage,engine,transmission,fuel_type,drivetrain,purchase_date,purchase_price,purchase_source,status,lot_location,asking_price,notes
+S0001,1HGBH41JXMN109186,2022,Toyota,Camry,XLE,Sedan,Pearl White,42000,2.5L 4-cyl,Automatic,Gasoline,FWD,2026-03-01,18500,Auction,In Recon,Row A Bay 1,22900,Clean title
+,1FTFW1E85MFA12345,2021,Ford,F-150,XLT,Pickup Truck,Silver,55000,3.5L V6,Automatic,Gasoline,4WD,2026-03-05,28000,Private,,Available,,

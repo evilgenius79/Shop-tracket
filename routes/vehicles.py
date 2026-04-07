@@ -1,9 +1,11 @@
+import csv
+import io
 from datetime import date, datetime, timezone
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, send_file, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import func, or_
-from models import db, Vehicle, Expense, ReconTask, Sale, EXPENSE_CATEGORIES
-from forms import VehicleForm, SaleForm, PhotoUploadForm
+from models import db, Vehicle, Expense, ReconTask, Sale, PriceHistory, EXPENSE_CATEGORIES
+from forms import VehicleForm, SaleForm, PhotoUploadForm, VehicleImportForm
 from routes.activity import log_activity
 
 vehicles_bp = Blueprint('vehicles', __name__)
@@ -271,6 +273,7 @@ def vehicle_detail(vehicle_id):
     photo_form = PhotoUploadForm()
     photos = vehicle.photos.order_by('sort_order').all()
     activity_logs = vehicle.activity_logs.limit(50).all()
+    price_history = vehicle.price_changes.all()
 
     return render_template('vehicles/detail.html',
         vehicle=vehicle,
@@ -282,6 +285,7 @@ def vehicle_detail(vehicle_id):
         photo_form=photo_form,
         photos=photos,
         activity_logs=activity_logs,
+        price_history=price_history,
         expense_categories=EXPENSE_CATEGORIES,
     )
 
@@ -315,8 +319,10 @@ def edit_vehicle(vehicle_id):
                 flash(f'VIN {form.vin.data} belongs to Stock #{vin_exists.stock_number}.', 'danger')
                 return render_template('vehicles/form.html', form=form, title='Edit Vehicle', vehicle=vehicle)
 
-        old_price = float(vehicle.purchase_price)
-        new_price = float(form.purchase_price.data)
+        old_purchase = float(vehicle.purchase_price)
+        new_purchase = float(form.purchase_price.data)
+        old_asking = float(vehicle.asking_price) if vehicle.asking_price else None
+        new_asking = float(form.asking_price.data) if form.asking_price.data else None
 
         vehicle.stock_number = form.stock_number.data.upper()
         vehicle.vin = form.vin.data.upper() if form.vin.data else None
@@ -347,15 +353,28 @@ def edit_vehicle(vehicle_id):
         vehicle.notes = form.notes.data
         vehicle.updated_at = datetime.now(timezone.utc)
 
-        # Update purchase expense if price changed
-        if old_price != new_price:
+        # Update purchase expense if purchase price changed
+        if old_purchase != new_purchase:
             purchase_exp = vehicle.expenses.filter_by(category='Purchase', subcategory='Purchase Price').first()
             if purchase_exp:
-                purchase_exp.amount = new_price
+                purchase_exp.amount = new_purchase
                 purchase_exp.expense_date = vehicle.purchase_date
 
-        log_activity(vehicle.id, 'Vehicle updated',
-                     f'Status: {vehicle.status}, Asking: {vehicle.asking_price}')
+        # Log asking price change to price history
+        if old_asking != new_asking:
+            ph = PriceHistory(
+                vehicle_id=vehicle.id,
+                old_price=old_asking,
+                new_price=new_asking,
+                changed_by_id=current_user.id,
+            )
+            db.session.add(ph)
+            log_activity(vehicle.id, 'Asking price changed',
+                         f'${old_asking:,.2f} → ${new_asking:,.2f}' if old_asking and new_asking
+                         else f'Set to ${new_asking:,.2f}' if new_asking else 'Cleared')
+        else:
+            log_activity(vehicle.id, 'Vehicle updated',
+                         f'Status: {vehicle.status}, Asking: {vehicle.asking_price}')
         db.session.commit()
         flash(f'Vehicle {vehicle.display_name} updated.', 'success')
         return redirect(url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id))
@@ -459,3 +478,89 @@ def delete_vehicle(vehicle_id):
     db.session.commit()
     flash(f'{name} (#{stock}) has been deleted.', 'success')
     return redirect(url_for('vehicles.list_vehicles'))
+
+
+@vehicles_bp.route('/vehicles/<int:vehicle_id>/sticker')
+@login_required
+def vehicle_sticker(vehicle_id):
+    vehicle = Vehicle.query.get_or_404(vehicle_id)
+    vehicle_url = request.host_url.rstrip('/') + url_for('vehicles.vehicle_detail', vehicle_id=vehicle_id)
+    return render_template('vehicles/sticker.html', vehicle=vehicle, vehicle_url=vehicle_url)
+
+
+@vehicles_bp.route('/vehicles/import', methods=['GET', 'POST'])
+@login_required
+def import_vehicles():
+    form = VehicleImportForm()
+    results = None
+
+    if form.validate_on_submit():
+        raw = form.csv_file.data.read().decode('utf-8-sig', errors='replace')
+        reader = csv.DictReader(io.StringIO(raw))
+        required_cols = {'year', 'make', 'model', 'purchase_date', 'purchase_price'}
+
+        if not required_cols.issubset({c.strip().lower() for c in (reader.fieldnames or [])}):
+            flash(f'CSV must have columns: {", ".join(sorted(required_cols))}', 'danger')
+            return render_template('vehicles/import.html', form=form, results=None)
+
+        results = {'added': [], 'skipped': [], 'errors': []}
+
+        for i, row in enumerate(reader, start=2):
+            row = {k.strip().lower(): (v or '').strip() for k, v in row.items()}
+            stock = row.get('stock_number', '').upper() or _next_stock_number()
+
+            # Skip duplicate stock numbers
+            if Vehicle.query.filter_by(stock_number=stock).first():
+                results['skipped'].append(f'Row {i}: stock #{stock} already exists')
+                continue
+
+            try:
+                yr = int(row['year'])
+                price = float(row['purchase_price'].replace(',', '').replace('$', ''))
+                pdate = date.fromisoformat(row['purchase_date'])
+            except (ValueError, KeyError) as e:
+                results['errors'].append(f'Row {i}: {e}')
+                continue
+
+            v = Vehicle(
+                stock_number=stock,
+                vin=row.get('vin', '').upper() or None,
+                year=yr,
+                make=row.get('make', '').title(),
+                model=row.get('model', '').title(),
+                trim=row.get('trim') or None,
+                body_type=row.get('body_type') or None,
+                color_exterior=row.get('color_exterior') or None,
+                mileage=int(row['mileage'].replace(',', '')) if row.get('mileage') else None,
+                transmission=row.get('transmission') or None,
+                engine=row.get('engine') or None,
+                fuel_type=row.get('fuel_type') or None,
+                drivetrain=row.get('drivetrain') or None,
+                purchase_date=pdate,
+                purchase_price=price,
+                purchase_source=row.get('purchase_source') or None,
+                status=row.get('status') or 'In Recon',
+                lot_location=row.get('lot_location') or None,
+                asking_price=float(row['asking_price'].replace(',', '').replace('$', ''))
+                             if row.get('asking_price') else None,
+                notes=row.get('notes') or None,
+                created_by_id=current_user.id,
+            )
+            db.session.add(v)
+            db.session.flush()
+
+            exp = Expense(
+                vehicle_id=v.id,
+                category='Purchase', subcategory='Purchase Price',
+                description=f'Vehicle purchase from {v.purchase_source or "unknown"}',
+                amount=price, expense_date=pdate, created_by_id=current_user.id,
+            )
+            db.session.add(exp)
+            log_activity(v.id, 'Vehicle imported', f'Imported from CSV by {current_user.username}')
+            results['added'].append(f'#{stock} — {v.display_name}')
+
+        db.session.commit()
+        flash(f"Import complete: {len(results['added'])} added, "
+              f"{len(results['skipped'])} skipped, {len(results['errors'])} errors.", 'info')
+
+    return render_template('vehicles/import.html', form=form, results=results)

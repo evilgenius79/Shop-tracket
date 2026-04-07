@@ -1,4 +1,5 @@
 import re
+from datetime import date as _date
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileSize
 from wtforms import (
@@ -33,7 +34,7 @@ class UserForm(FlaskForm):
     is_active = BooleanField('Active', default=True)
 
 
-CURRENT_YEAR = 2026
+CURRENT_YEAR = _date.today().year
 YEAR_CHOICES = [(str(y), str(y)) for y in range(CURRENT_YEAR + 1, 1979, -1)]
 
 BODY_TYPES = [
@@ -223,3 +224,10 @@ class PasswordChangeForm(FlaskForm):
 class PhotoUploadForm(FlaskForm):
     photos = MultipleFileField('Photos', validators=[DataRequired()])
     caption = StringField('Caption', validators=[Optional(), Length(0, 100)])
+
+
+class VehicleImportForm(FlaskForm):
+    csv_file = FileField('CSV File', validators=[
+        DataRequired(),
+        FileAllowed(['csv'], 'CSV files only.'),
+    ])

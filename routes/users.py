@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, request
+import os
+from datetime import date
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, request, send_file, current_app
 from flask_login import login_required, current_user
 from models import db, User
 from forms import UserForm
@@ -133,3 +135,18 @@ def profile():
         flash('Password updated successfully.', 'success')
         return redirect(url_for('users.profile'))
     return render_template('users/profile.html', form=form)
+
+
+@users_bp.route('/backup')
+@login_required
+def backup_db():
+    if not current_user.is_admin():
+        abort(403)
+    db_path = current_app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
+    if not os.path.isabs(db_path):
+        db_path = os.path.join(current_app.root_path, db_path)
+    if not os.path.exists(db_path):
+        flash('Database file not found.', 'danger')
+        return redirect(url_for('users.list_users'))
+    filename = f'carlot_backup_{date.today().isoformat()}.db'
+    return send_file(db_path, as_attachment=True, download_name=filename)

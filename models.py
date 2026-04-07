@@ -98,6 +98,8 @@ class Vehicle(db.Model):
                              order_by='VehiclePhoto.sort_order', cascade='all, delete-orphan')
     activity_logs = db.relationship('ActivityLog', backref='vehicle', lazy='dynamic',
                                     order_by='ActivityLog.created_at.desc()', cascade='all, delete-orphan')
+    price_changes = db.relationship('PriceHistory', backref='vehicle', lazy='dynamic',
+                                    order_by='PriceHistory.changed_at.desc()', cascade='all, delete-orphan')
 
     @property
     def days_on_lot(self):
@@ -128,6 +130,19 @@ class Vehicle(db.Model):
         if self.sale:
             return float(self.sale.sale_price) - self.total_cost
         return None
+
+    @property
+    def gross_margin_pct(self):
+        """Gross profit as a percentage of sale price."""
+        if self.sale and self.sale.sale_price and float(self.sale.sale_price) > 0:
+            return round(self.gross_profit / float(self.sale.sale_price) * 100, 1)
+        return None
+
+    @property
+    def daily_cost(self):
+        """Total cost divided by days on lot — shows the daily bleed rate."""
+        days = max(self.days_on_lot, 1)
+        return round(self.total_cost / days, 2)
 
     @property
     def days_in_recon(self):
@@ -287,3 +302,19 @@ class ActivityLog(db.Model):
 
     def __repr__(self):
         return f'<ActivityLog vehicle_id={self.vehicle_id} action={self.action}>'
+
+
+class PriceHistory(db.Model):
+    __tablename__ = 'price_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    vehicle_id = db.Column(db.Integer, db.ForeignKey('vehicles.id'), nullable=False, index=True)
+    old_price = db.Column(db.Numeric(10, 2))
+    new_price = db.Column(db.Numeric(10, 2), nullable=False)
+    changed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    changed_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    changed_by = db.relationship('User', foreign_keys=[changed_by_id])
+
+    def __repr__(self):
+        return f'<PriceHistory vehicle_id={self.vehicle_id} ${self.old_price}→${self.new_price}>'

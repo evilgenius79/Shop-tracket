@@ -88,6 +88,7 @@
                         <th class="text-end">Total Cost</th>
                         <th class="text-end">Sale Price</th>
                         <th class="text-end">Gross Profit</th>
+                        <th class="text-end">Margin</th>
                         <th>Type</th>
                     </tr>
                 </thead>
@@ -104,6 +105,9 @@
                         <td class="text-end fw-bold {% if gp and gp >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {{ gp | currency if gp is not none else '–' }}
                         </td>
+                        <td class="text-end text-muted small">
+                            {% if v.gross_margin_pct is not none %}{{ v.gross_margin_pct }}%{% else %}–{% endif %}
+                        </td>
                         <td><span class="badge bg-secondary">{{ v.sale.sale_type or '–' }}</span></td>
                     </tr>
                     {% endfor %}
@@ -114,6 +118,9 @@
                         <td class="text-end">{{ total_cost | currency }}</td>
                         <td class="text-end">{{ total_revenue | currency }}</td>
                         <td class="text-end {% if total_gross >= 0 %}text-success{% else %}text-danger{% endif %}">{{ total_gross | currency }}</td>
+                        <td class="text-end text-muted small">
+                            {% if total_revenue > 0 %}{{ ((total_gross / total_revenue) * 100) | round(1) }}%{% endif %}
+                        </td>
                         <td></td>
                     </tr>
                 </tfoot>
